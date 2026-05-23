@@ -1,3 +1,240 @@
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Building2, FolderOpen, Archive, MoreVertical } from 'lucide-react'
+import { supabase } from '../lib/supabase'
+
+interface Department {
+  id: string
+  name: string
+  archived: boolean
+  sort_order: number
+  created_at: string
+}
+
 export default function DepartmentsPage() {
-    return <div>Departments Page</div>
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [showAdd, setShowAdd] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [menuOpen, setMenuOpen] = useState<string | null>(null)
+
+  const { data: departments = [], isLoading } = useQuery({
+    queryKey: ['departments'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*')
+        .order('sort_order', { ascending: true })
+      if (error) throw error
+      return data as Department[]
+    }
+  })
+
+  const { data: projectCounts = {} } = useQuery({
+    queryKey: ['project-counts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('department_id')
+        .eq('archived', false)
+      if (error) throw error
+      const counts: Record<string, number> = {}
+      data.forEach((p: { department_id: string }) => {
+        counts[p.department_id] = (counts[p.department_id] || 0) + 1
+      })
+      return counts
+    }
+  })
+
+  const addMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const { error } = await supabase
+        .from('departments')
+        .insert({ name, sort_order: departments.length })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['departments'] })
+      setNewName('')
+      setShowAdd(false)
+    }
+  })
+
+  const archiveMutation = useMutation({
+    mutationFn: async ({ id, archived }: { id: string; archived: boolean }) => {
+      const { error } = await supabase
+        .from('departments')
+        .update({ archived })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['departments'] })
+      setMenuOpen(null)
+    }
+  })
+
+  const active = departments.filter((d: Department) => !d.archived)
+  const archived = departments.filter((d: Department) => d.archived)
+
+  if (isLoading) {
+    return (
+      <div className="spinner-wrap">
+        <div className="spinner" />
+      </div>
+    )
   }
+
+  return (
+    <div>
+      {/* Page Header */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Departments</h1>
+          <p className="page-subtitle">{active.length} active department{active.length !== 1 ? 's' : ''}</p>
+        </div>
+        <button className="btn-primary" onClick={() => setShowAdd(true)}>
+          <Plus size={16} />
+          Add Department
+        </button>
+      </div>
+
+      {/* Add Form */}
+      {showAdd && (
+        <div className="add-form">
+          <input
+            autoFocus
+            type="text"
+            placeholder="Department name..."
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && newName.trim()) addMutation.mutate(newName.trim())
+              if (e.key === 'Escape') { setShowAdd(false); setNewName('') }
+            }}
+          />
+          <button
+            className="btn-primary"
+            onClick={() => newName.trim() && addMutation.mutate(newName.trim())}
+            disabled={!newName.trim()}
+          >
+            Add
+          </button>
+          <button
+            className="btn-ghost"
+            onClick={() => { setShowAdd(false); setNewName('') }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Active Departments */}
+      {active.length === 0 && !showAdd ? (
+        <div className="empty-state">
+          <Building2 size={32} style={{ color: '#d1d5db', margin: '0 auto' }} />
+          <p>No departments yet</p>
+          <span>Add your first department to get started</span>
+        </div>
+      ) : (
+        <div className="cards-grid">
+          {active.map((dept: Department) => (
+            <div
+              key={dept.id}
+              className="dept-card"
+              onClick={() => navigate(`/departments/${dept.id}`)}
+            >
+              <button
+                className="btn-ghost card-menu-btn"
+                onClick={e => { e.stopPropagation(); setMenuOpen(menuOpen === dept.id ? null : dept.id) }}
+              >
+                <MoreVertical size={16} />
+              </button>
+
+              {menuOpen === dept.id && (
+                <div className="dropdown">
+                  <button
+                    className="dropdown-item"
+                    onClick={e => { e.stopPropagation(); archiveMutation.mutate({ id: dept.id, archived: true }) }}
+                  >
+                    <Archive size={14} />
+                    Archive
+                  </button>
+                </div>
+              )}
+
+              <div className="dept-card-header">
+                <div className="dept-icon">
+                  <Building2 size={18} />
+                </div>
+                <div>
+                  <div className="dept-name">{dept.name}</div>
+                  <div className="dept-meta">{projectCounts[dept.id] || 0} project{(projectCounts[dept.id] || 0) !== 1 ? 's' : ''}</div>
+                </div>
+              </div>
+
+              <div className="progress-wrap">
+                <div className="progress-label">
+                  <span>Progress</span>
+                  <span>0%</span>
+                </div>
+                <div className="progress-track">
+                  <div className="progress-bar" style={{ width: '0%' }} />
+                </div>
+              </div>
+
+              <div className="dept-card-footer">
+                <FolderOpen size={12} />
+                <span>Click to view projects</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Archived */}
+      {archived.length > 0 && (
+        <div>
+          <p className="section-label">Archived</p>
+          <div className="cards-grid">
+            {archived.map((dept: Department) => (
+              <div key={dept.id} className="dept-card archived">
+                <button
+                  className="btn-ghost card-menu-btn"
+                  onClick={e => { e.stopPropagation(); setMenuOpen(menuOpen === dept.id ? null : dept.id) }}
+                >
+                  <MoreVertical size={16} />
+                </button>
+
+                {menuOpen === dept.id && (
+                  <div className="dropdown">
+                    <button
+                      className="dropdown-item"
+                      onClick={() => archiveMutation.mutate({ id: dept.id, archived: false })}
+                    >
+                      <Archive size={14} />
+                      Unarchive
+                    </button>
+                  </div>
+                )}
+
+                <div className="dept-card-header">
+                  <div className="dept-icon" style={{ background: '#e5e7eb' }}>
+                    <Building2 size={18} style={{ color: '#9ca3af' }} />
+                  </div>
+                  <div>
+                    <div className="dept-name" style={{ color: '#9ca3af' }}>{dept.name}</div>
+                    <div className="dept-meta">Archived</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {menuOpen && <div className="overlay" onClick={() => setMenuOpen(null)} />}
+    </div>
+  )
+}
