@@ -83,6 +83,61 @@ export default function DepartmentPage() {
     enabled: projects.length > 0
   })
 
+  const { data: projectProgress = {} } = useQuery({
+    queryKey: ['project-progress', id],
+    queryFn: async () => {
+      if (projects.length === 0) return {}
+      const projectIds = projects.map(p => p.id)
+      const { data: comps } = await supabase.from('components').select('id, project_id').in('project_id', projectIds)
+      if (!comps?.length) return {}
+      const compIds = comps.map(c => c.id)
+      const { data: issuesList } = await supabase.from('issues').select('id, component_id').in('component_id', compIds)
+      if (!issuesList?.length) return {}
+      const issueIds = issuesList.map(i => i.id)
+      const { data: fields } = await supabase.from('issue_fields').select('issue_id, status_id').in('issue_id', issueIds)
+      if (!fields?.length) return {}
+      const { data: completeStatus } = await supabase.from('statuses').select('id').eq('name', 'Complete').single()
+      if (!completeStatus) return {}
+  
+      const compToProject: Record<string, string> = {}
+      comps.forEach(c => { compToProject[c.id] = c.project_id })
+      const issueToComp: Record<string, string> = {}
+      issuesList.forEach(i => { issueToComp[i.id] = i.component_id })
+  
+      // Progress per issue
+      const issueFields: Record<string, { total: number; complete: number }> = {}
+      fields.forEach(f => {
+        if (!issueFields[f.issue_id]) issueFields[f.issue_id] = { total: 0, complete: 0 }
+        issueFields[f.issue_id].total++
+        if (f.status_id === completeStatus.id) issueFields[f.issue_id].complete++
+      })
+  
+      // Progress per component
+      const compFields: Record<string, number[]> = {}
+      Object.entries(issueFields).forEach(([issueId, { total, complete }]) => {
+        const compId = issueToComp[issueId]
+        if (!compId) return
+        if (!compFields[compId]) compFields[compId] = []
+        compFields[compId].push(total > 0 ? Math.round((complete / total) * 100) : 0)
+      })
+  
+      // Progress per project
+      const progress: Record<string, number> = {}
+      projectIds.forEach(projId => {
+        const projComps = comps.filter(c => c.project_id === projId)
+        if (projComps.length === 0) { progress[projId] = 0; return }
+        const compProgressValues = projComps.map(c => {
+          const vals = compFields[c.id]
+          if (!vals || vals.length === 0) return 0
+          return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
+        })
+        progress[projId] = Math.round(compProgressValues.reduce((a, b) => a + b, 0) / compProgressValues.length)
+      })
+      return progress
+    },
+    enabled: projects.length > 0
+  })
+
   const addMutation = useMutation({
     mutationFn: async (name: string) => {
       const { error } = await supabase.from('projects').insert({
@@ -197,11 +252,11 @@ export default function DepartmentPage() {
               <div style={{ fontSize: '13px', color: '#6b7280' }}>—</div>
               <div style={{ fontSize: '13px', color: '#6b7280' }}>—</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ flex: 1, height: '6px', background: '#f3f4f6', borderRadius: '999px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', background: 'linear-gradient(to right, #ed1c24, #fcaf17)', borderRadius: '999px', width: '0%' }} />
-                </div>
-                <span style={{ fontSize: '12px', fontWeight: '600', color: '#2c2c2b', minWidth: '32px', textAlign: 'right' }}>0%</span>
-              </div>
+  <div style={{ flex: 1, height: '6px', background: '#f3f4f6', borderRadius: '999px', overflow: 'hidden' }}>
+    <div style={{ height: '100%', background: 'linear-gradient(to right, #ed1c24, #fcaf17)', borderRadius: '999px', width: `${projectProgress[project.id] || 0}%` }} />
+  </div>
+  <span style={{ fontSize: '12px', fontWeight: '600', color: '#2c2c2b', minWidth: '32px', textAlign: 'right' }}>{projectProgress[project.id] || 0}%</span>
+</div>
               <div style={{ position: 'relative', zIndex: 10 }} onClick={e => e.stopPropagation()}>
                 <button className="btn-ghost" onClick={() => setMenuOpen(menuOpen === project.id ? null : project.id)}>
                   <MoreVertical size={15} />

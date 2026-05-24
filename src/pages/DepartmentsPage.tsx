@@ -71,6 +71,68 @@ export default function DepartmentsPage() {
     enabled: departments.length > 0
   })
 
+  const { data: deptProgress = {} } = useQuery({
+    queryKey: ['dept-progress'],
+    queryFn: async () => {
+      if (departments.length === 0) return {}
+      const deptIds = departments.map(d => d.id)
+      const { data: projs } = await supabase.from('projects').select('id, department_id').in('department_id', deptIds).eq('archived', false)
+      if (!projs?.length) return {}
+      const projIds = projs.map(p => p.id)
+      const { data: comps } = await supabase.from('components').select('id, project_id').in('project_id', projIds)
+      if (!comps?.length) return {}
+      const compIds = comps.map(c => c.id)
+      const { data: issuesList } = await supabase.from('issues').select('id, component_id').in('component_id', compIds)
+      if (!issuesList?.length) return {}
+      const issueIds = issuesList.map(i => i.id)
+      const { data: fields } = await supabase.from('issue_fields').select('issue_id, status_id').in('issue_id', issueIds)
+      if (!fields?.length) return {}
+      const { data: completeStatus } = await supabase.from('statuses').select('id').eq('name', 'Complete').single()
+      if (!completeStatus) return {}
+  
+      const compToProject: Record<string, string> = {}
+      comps.forEach(c => { compToProject[c.id] = c.project_id })
+      const issueToComp: Record<string, string> = {}
+      issuesList.forEach(i => { issueToComp[i.id] = i.component_id })
+      const projToDept: Record<string, string> = {}
+      projs.forEach(p => { projToDept[p.id] = p.department_id })
+  
+      const issueProgress: Record<string, number> = {}
+      const issueFieldMap: Record<string, { total: number; complete: number }> = {}
+      fields.forEach(f => {
+        if (!issueFieldMap[f.issue_id]) issueFieldMap[f.issue_id] = { total: 0, complete: 0 }
+        issueFieldMap[f.issue_id].total++
+        if (f.status_id === completeStatus.id) issueFieldMap[f.issue_id].complete++
+      })
+      Object.entries(issueFieldMap).forEach(([issueId, { total, complete }]) => {
+        issueProgress[issueId] = total > 0 ? Math.round((complete / total) * 100) : 0
+      })
+  
+      const compProgress: Record<string, number> = {}
+      comps.forEach(c => {
+        const compIssues = issuesList.filter(i => i.component_id === c.id)
+        if (compIssues.length === 0) { compProgress[c.id] = 0; return }
+        compProgress[c.id] = Math.round(compIssues.reduce((sum, i) => sum + (issueProgress[i.id] || 0), 0) / compIssues.length)
+      })
+  
+      const projProgress: Record<string, number> = {}
+      projs.forEach(p => {
+        const projComps = comps.filter(c => c.project_id === p.id)
+        if (projComps.length === 0) { projProgress[p.id] = 0; return }
+        projProgress[p.id] = Math.round(projComps.reduce((sum, c) => sum + (compProgress[c.id] || 0), 0) / projComps.length)
+      })
+  
+      const deptProgressMap: Record<string, number> = {}
+      deptIds.forEach(deptId => {
+        const deptProjs = projs.filter(p => p.department_id === deptId)
+        if (deptProjs.length === 0) { deptProgressMap[deptId] = 0; return }
+        deptProgressMap[deptId] = Math.round(deptProjs.reduce((sum, p) => sum + (projProgress[p.id] || 0), 0) / deptProjs.length)
+      })
+      return deptProgressMap
+    },
+    enabled: departments.length > 0
+  })
+
   const addMutation = useMutation({
     mutationFn: async (name: string) => {
       const { error } = await supabase.from('departments').insert({ name, sort_order: departments.length })
@@ -163,14 +225,14 @@ export default function DepartmentsPage() {
               </div>
 
               <div className="progress-wrap">
-                <div className="progress-label">
-                  <span>Progress</span>
-                  <span>0%</span>
-                </div>
-                <div className="progress-track">
-                  <div className="progress-bar" style={{ width: '0%' }} />
-                </div>
-              </div>
+  <div className="progress-label">
+    <span>Progress</span>
+    <span>{deptProgress[dept.id] || 0}%</span>
+  </div>
+  <div className="progress-track">
+    <div className="progress-bar" style={{ width: `${deptProgress[dept.id] || 0}%` }} />
+  </div>
+</div>
 
               <div className="dept-card-footer">
                 <FolderOpen size={12} />
