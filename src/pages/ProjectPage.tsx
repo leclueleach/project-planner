@@ -264,24 +264,7 @@ export default function ProjectPage() {
   const projectHasWarning = components.some(c => componentHasWarning(c.id))
 
   // ── RECALC DATES ──────────────────────────────────────────
-  const recalcDates = useCallback(async (issueId: string, fromCategoryIdx: number) => {
-    const sortedCats = [...categories].sort((a, b) => a.sort_order - b.sort_order)
-    for (let i = fromCategoryIdx; i < sortedCats.length; i++) {
-      const cat = sortedCats[i]
-      const field = issueFields.find(f => f.issue_id === issueId && f.category_id === cat.id)
-      if (!field || field.start_date_manual) continue
-      const prevCat = sortedCats[i - 1]
-      const prevField = issueFields.find(f => f.issue_id === issueId && f.category_id === prevCat.id)
-      if (!prevField?.end_date) continue
-      const newStart = nextWorkingDay(prevField.end_date, nonWorkDays)
-      let newEnd = field.end_date
-      if (field.lead_time && newStart) newEnd = addWorkingDays(newStart, field.lead_time, nonWorkDays)
-      await supabase.from('issue_fields').update({ start_date: newStart, end_date: newEnd }).eq('id', field.id)
-    }
-    queryClient.invalidateQueries({ queryKey: ['issue_fields', id] })
-  }, [categories, issueFields, nonWorkDays, queryClient, id])
-
-  const handleFieldUpdate = useCallback(async (field: IssueField, updates: Partial<IssueField>) => {
+    const handleFieldUpdate = useCallback(async (field: IssueField, updates: Partial<IssueField>) => {
     const updated = { ...field, ...updates }
     if ((updates.lead_time !== undefined || updates.start_date !== undefined) && updated.start_date && updated.lead_time) {
       updated.end_date = addWorkingDays(updated.start_date, updated.lead_time, nonWorkDays)

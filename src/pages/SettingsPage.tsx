@@ -8,7 +8,6 @@ type Tab = 'statuses' | 'staff' | 'nonworkdays' | 'users'
 interface Status { id: string; name: string; colour: string; sort_order: number; is_system: boolean }
 interface Staff { id: string; name: string; email: string | null; type: 'internal' | 'freelancer'; active: boolean }
 interface NonWorkDay { id: string; date: string; name: string; type: 'public_holiday' | 'company_holiday' }
-interface AppUser { id: string; name: string; email: string }
 
 function ConfirmDelete({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
   return (
