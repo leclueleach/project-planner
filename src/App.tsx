@@ -25,26 +25,22 @@ function App() {
 
   useEffect(() => {
     // Handle password reset redirect
-    const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'))
-    const type = hashParams.get('type')
-    if (type === 'recovery') {
-      setIsPasswordReset(true)
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordReset(true)
+        setLoading(false)
+        return
+      }
+      setSession(session)
+      if (session) checkMustChange(session.user.id)
       setLoading(false)
-      return
-    }
+    })
   
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       if (session) checkMustChange(session.user.id)
       setLoading(false)
     })
-  
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      if (session) checkMustChange(session.user.id)
-    })
-  
-    return () => subscription.unsubscribe()
   }, [])
 
   const handleLogin = async () => {
