@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Building2, FolderOpen, Archive, MoreVertical, AlertTriangle } from 'lucide-react'
@@ -18,6 +18,12 @@ export default function DepartmentsPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [newName, setNewName] = useState('')
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
+
+useEffect(() => {
+  const handleClick = () => setMenuOpen(null)
+  document.addEventListener('click', handleClick)
+  return () => document.removeEventListener('click', handleClick)
+}, [])
 
   const { data: departments = [], isLoading } = useQuery({
     queryKey: ['departments'],
@@ -250,17 +256,21 @@ export default function DepartmentsPage() {
           <div className="cards-grid">
             {archived.map(dept => (
               <div key={dept.id} className="dept-card archived">
-                <button className="btn-ghost card-menu-btn"
-                  onClick={e => { e.stopPropagation(); setMenuOpen(menuOpen === dept.id ? null : dept.id) }}>
-                  <MoreVertical size={16} />
-                </button>
-                {menuOpen === dept.id && (
-                  <div className="dropdown">
-                    <button className="dropdown-item" onClick={() => archiveMutation.mutate({ id: dept.id, archived: false })}>
-                      <Archive size={14} /> Unarchive
-                    </button>
-                  </div>
-                )}
+              <button 
+  className="menu-btn"
+  onClick={e => { e.stopPropagation(); setMenuOpen(menuOpen === dept.id ? null : dept.id) }}>
+  <MoreVertical size={16} />
+</button>
+            
+              {menuOpen === dept.id && (
+                <div className="dropdown" style={{ zIndex: 20 }}>
+                  <button className="dropdown-item" style={{ color: '#2c2c2b' }} onClick={() => archiveMutation.mutate({ id: dept.id, archived: false })}>
+                    <Archive size={14} /> Unarchive
+                  </button>
+                </div>
+              )}
+            
+              <div style={{ opacity: 0.6 }}>
                 <div className="dept-card-header">
                   <div className="dept-icon" style={{ background: '#e5e7eb' }}>
                     <Building2 size={18} style={{ color: '#9ca3af' }} />
@@ -271,12 +281,13 @@ export default function DepartmentsPage() {
                   </div>
                 </div>
               </div>
+            </div>
             ))}
           </div>
         </div>
       )}
 
-      {menuOpen && <div className="overlay" onClick={() => setMenuOpen(null)} />}
+      
     </div>
   )
 }

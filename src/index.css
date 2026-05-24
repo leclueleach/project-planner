@@ -54,6 +54,7 @@ body {
 /* MENU */
 .card-menu-btn { position: absolute; top: 16px; right: 16px; opacity: 0; transition: opacity 0.15s; }
 .dept-card:hover .card-menu-btn { opacity: 1; }
+.dept-card.archived .card-menu-btn { opacity: 1; }
 .dropdown { position: absolute; top: 40px; right: 16px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 10; padding: 4px 0; min-width: 140px; }
 .dropdown-item { width: 100%; text-align: left; padding: 8px 12px; font-size: 14px; color: #374151; background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.15s; }
 .dropdown-item:hover { background: #f9fafb; }
@@ -70,7 +71,7 @@ body {
 
 /* ARCHIVED SECTION */
 .section-label { font-size: 12px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
-.dept-card.archived { opacity: 0.6; background: #f9fafb; cursor: default; }
+.dept-card.archived { background: #f9fafb; cursor: default; }
 .dept-card.archived:hover { border-color: #e5e7eb; box-shadow: none; }
 
 /* SPINNER */
@@ -79,4 +80,7 @@ body {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* OVERLAY */
-.overlay { position: fixed; inset: 0; z-index: 0; }
+.overlay { position: fixed; inset: 0; z-index: 30; }
+
+.menu-btn { position: absolute; top: 16px; right: 16px; z-index: 10; background: none; border: none; color: #9ca3af; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+.menu-btn:hover { background: #f3f4f6; color: #374151; }

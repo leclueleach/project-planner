@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Plus, ArrowLeft, FolderOpen, Archive, MoreVertical, ChevronRight, AlertTriangle } from 'lucide-react'
@@ -35,6 +35,12 @@ export default function DepartmentPage() {
   const [newEndDate, setNewEndDate] = useState('')
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [confirmArchive, setConfirmArchive] = useState<string | null>(null)
+
+  useEffect(() => {
+    const handleClick = () => setMenuOpen(null)
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
+  }, [])
 
   const { data: department } = useQuery({
     queryKey: ['department', id],
@@ -134,6 +140,47 @@ export default function DepartmentPage() {
         progress[projId] = Math.round(compProgressValues.reduce((a, b) => a + b, 0) / compProgressValues.length)
       })
       return progress
+    },
+    enabled: projects.length > 0
+  })
+
+  const { data: projectActualDates = {} } = useQuery({
+    queryKey: ['project-actual-dates', id],
+    queryFn: async () => {
+      if (projects.length === 0) return {}
+      const projectIds = projects.map(p => p.id)
+      const { data: comps } = await supabase.from('components').select('id, project_id').in('project_id', projectIds)
+      if (!comps?.length) return {}
+      const compIds = comps.map(c => c.id)
+      const { data: issuesList } = await supabase.from('issues').select('id, component_id').in('component_id', compIds)
+      if (!issuesList?.length) return {}
+      const issueIds = issuesList.map(i => i.id)
+      const { data: fields } = await supabase.from('issue_fields').select('issue_id, start_date, end_date').in('issue_id', issueIds)
+      if (!fields?.length) return {}
+  
+      const compToProject: Record<string, string> = {}
+      comps.forEach(c => { compToProject[c.id] = c.project_id })
+      const issueToProject: Record<string, string> = {}
+      issuesList.forEach(i => { issueToProject[i.id] = compToProject[i.component_id] })
+  
+      const dates: Record<string, { start: string | null; end: string | null }> = {}
+      projectIds.forEach(pid => { dates[pid] = { start: null, end: null } })
+  
+      fields.forEach(f => {
+        const projId = issueToProject[f.issue_id]
+        if (!projId) return
+        if (f.start_date) {
+          if (!dates[projId].start || f.start_date < dates[projId].start!) {
+            dates[projId].start = f.start_date
+          }
+        }
+        if (f.end_date) {
+          if (!dates[projId].end || f.end_date > dates[projId].end!) {
+            dates[projId].end = f.end_date
+          }
+        }
+      })
+      return dates
     },
     enabled: projects.length > 0
   })
@@ -249,8 +296,8 @@ export default function DepartmentPage() {
               </div>
               <div style={{ fontSize: '13px', color: '#6b7280' }}>{formatDate(project.planned_start_date)}</div>
               <div style={{ fontSize: '13px', color: '#6b7280' }}>{formatDate(project.planned_end_date)}</div>
-              <div style={{ fontSize: '13px', color: '#6b7280' }}>—</div>
-              <div style={{ fontSize: '13px', color: '#6b7280' }}>—</div>
+              <div style={{ fontSize: '13px', color: '#6b7280' }}>{formatDate(projectActualDates[project.id]?.start || null)}</div>
+              <div style={{ fontSize: '13px', color: '#6b7280' }}>{formatDate(projectActualDates[project.id]?.end || null)}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
   <div style={{ flex: 1, height: '6px', background: '#f3f4f6', borderRadius: '999px', overflow: 'hidden' }}>
     <div style={{ height: '100%', background: 'linear-gradient(to right, #ed1c24, #fcaf17)', borderRadius: '999px', width: `${projectProgress[project.id] || 0}%` }} />
@@ -286,35 +333,35 @@ export default function DepartmentPage() {
           <p className="section-label">Archived Projects</p>
           <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'visible' }}>
             {archived.map((project, i) => (
-              <div key={project.id} style={{ display: 'grid', gridTemplateColumns: headerCols, gap: '12px', padding: '14px 20px', borderBottom: i < archived.length - 1 ? '1px solid #f3f4f6' : 'none', alignItems: 'center', opacity: 0.5 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ChevronRight size={14} style={{ color: '#9ca3af' }} />
-                  <span style={{ fontSize: '14px', fontWeight: '500', color: '#6b7280' }}>{project.name}</span>
-                </div>
-                <div style={{ fontSize: '13px', color: '#6b7280' }}>{formatDate(project.planned_start_date)}</div>
-                <div style={{ fontSize: '13px', color: '#6b7280' }}>{formatDate(project.planned_end_date)}</div>
-                <div style={{ fontSize: '13px', color: '#6b7280' }}>—</div>
-                <div style={{ fontSize: '13px', color: '#6b7280' }}>—</div>
-                <div style={{ fontSize: '12px', color: '#9ca3af' }}>Archived</div>
-                <div style={{ position: 'relative', zIndex: 10 }} onClick={e => e.stopPropagation()}>
-                  <button className="btn-ghost" onClick={() => setMenuOpen(menuOpen === project.id ? null : project.id)}>
-                    <MoreVertical size={15} />
-                  </button>
-                  {menuOpen === project.id && (
-                    <div className="dropdown" style={{ right: 0, left: 'auto', zIndex: 20 }}>
-                      <button className="dropdown-item" onClick={() => archiveMutation.mutate({ projectId: project.id, archived: false })}>
-                        <Archive size={14} /> Unarchive
-                      </button>
-                    </div>
-                  )}
-                </div>
+              <div key={project.id} style={{ display: 'grid', gridTemplateColumns: headerCols, gap: '12px', padding: '14px 20px', borderBottom: i < archived.length - 1 ? '1px solid #f3f4f6' : 'none', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.5 }}>
+                <ChevronRight size={14} style={{ color: '#9ca3af' }} />
+                <span style={{ fontSize: '14px', fontWeight: '500', color: '#6b7280' }}>{project.name}</span>
+              </div>
+              <div style={{ fontSize: '13px', color: '#6b7280', opacity: 0.5 }}>{formatDate(project.planned_start_date)}</div>
+              <div style={{ fontSize: '13px', color: '#6b7280', opacity: 0.5 }}>{formatDate(project.planned_end_date)}</div>
+              <div style={{ fontSize: '13px', color: '#6b7280', opacity: 0.5 }}>{formatDate(projectActualDates[project.id]?.start || null)}</div>
+              <div style={{ fontSize: '13px', color: '#6b7280', opacity: 0.5 }}>{formatDate(projectActualDates[project.id]?.end || null)}</div>
+              <div style={{ fontSize: '12px', color: '#9ca3af', opacity: 0.5 }}>Archived</div>
+              <div style={{ position: 'relative', zIndex: 10 }} onClick={e => e.stopPropagation()}>
+                <button className="btn-ghost" onClick={() => setMenuOpen(menuOpen === project.id ? null : project.id)}>
+                  <MoreVertical size={15} />
+                </button>
+                {menuOpen === project.id && (
+                  <div className="dropdown" style={{ right: 0, left: 'auto', zIndex: 30 }}>
+                    <button className="dropdown-item" onClick={() => archiveMutation.mutate({ projectId: project.id, archived: false })}>
+                      <Archive size={14} /> Unarchive
+                    </button>
+                  </div>
+                )}
+              </div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {menuOpen && <div className="overlay" onClick={() => setMenuOpen(null)} />}
+      
     </div>
   )
 }
