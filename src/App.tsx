@@ -10,6 +10,7 @@ import SettingsPage from './pages/SettingsPage'
 import ProfilePage from './pages/ProfilePage'
 import HistoryPage from './pages/HistoryPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import DashboardPage from './pages/DashboardPage'
 
 function App() {
   const [session, setSession] = useState<any>(null)
@@ -93,6 +94,7 @@ function App() {
       <Route path="/" element={<Layout />}>
         <Route index element={<DepartmentsPage />} />
         <Route path="departments/:id" element={<DepartmentPage />} />
+        <Route path="dashboard" element={<DashboardPage />} />
         <Route path="projects/:id" element={<ProjectPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="profile" element={<ProfilePage />} />

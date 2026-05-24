@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { LayoutDashboard, Settings, LogOut, UserCircle, History } from 'lucide-react'
+import { LayoutDashboard, Settings, LogOut, UserCircle, History, BarChart2 } from 'lucide-react'
 
 export default function Layout() {
   const navigate = useNavigate()
@@ -33,6 +34,10 @@ export default function Layout() {
           <NavLink to="/history" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
   <History size={16} />
   History
+</NavLink>
+<NavLink to="/dashboard" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+  <BarChart2 size={16} />
+  Dashboard
 </NavLink>
           <button onClick={handleSignOut} className="nav-link" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
             <LogOut size={16} />
