@@ -24,16 +24,23 @@ function App() {
   }
 
   useEffect(() => {
-    // Handle password reset redirect
     supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         setIsPasswordReset(true)
         setLoading(false)
         return
       }
-      setSession(session)
-      if (session) checkMustChange(session.user.id)
-      setLoading(false)
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setIsPasswordReset(false)
+        setSession(session)
+        if (session) checkMustChange(session.user.id)
+        setLoading(false)
+      }
+      if (event === 'SIGNED_OUT') {
+        setSession(null)
+        setIsPasswordReset(false)
+        setLoading(false)
+      }
     })
   
     supabase.auth.getSession().then(({ data: { session } }) => {
