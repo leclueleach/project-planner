@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const [filterDateFrom, setFilterDateFrom] = useState('')
   const [filterDateTo, setFilterDateTo] = useState('')
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  const [filterProject, setFilterProject] = useState<string[]>([])
 
   useEffect(() => {
     const handleClick = () => setOpenDropdown(null)
@@ -158,6 +159,7 @@ export default function DashboardPage() {
   // ── FILTERED PROJECTS ─────────────────────────────────────
   const filteredProjects = projects.filter(p => {
     if (filterDept.length > 0 && !filterDept.includes(p.department_id)) return false
+    if (filterProject.length > 0 && !filterProject.includes(p.id)) return false
     if (!projectInDateRange(p)) return false
     if (filterStaff.length > 0 || filterFreelancer.length > 0) {
       const allStaffFilter = [...filterStaff, ...filterFreelancer]
@@ -192,7 +194,7 @@ export default function DashboardPage() {
   const internalStaff = staff.filter(s => s.type === 'internal')
   const freelancers = staff.filter(s => s.type === 'freelancer')
 
-  const hasFilters = filterDept.length > 0 || filterStaff.length > 0 || filterFreelancer.length > 0 || filterStatus.length > 0 || filterDateFrom || filterDateTo
+  const hasFilters = filterDept.length > 0 || filterStaff.length > 0 || filterFreelancer.length > 0 || filterStatus.length > 0 || filterProject.length > 0 || filterDateFrom || filterDateTo
 
   // ── FILTER DROPDOWN COMPONENT ─────────────────────────────
   function FilterDropdown({ id, label, options, selected, onChange }: {
@@ -243,6 +245,8 @@ export default function DashboardPage() {
           </div>
           <FilterDropdown id="dept" label="Department" selected={filterDept} onChange={setFilterDept}
             options={departments.map(d => ({ value: d.id, label: d.name }))} />
+            <FilterDropdown id="project" label="Project" selected={filterProject} onChange={setFilterProject}
+  options={projects.map(p => ({ value: p.id, label: p.name }))} />
           <FilterDropdown id="status" label="Status" selected={filterStatus} onChange={setFilterStatus}
             options={[{ value: 'notstarted', label: 'Not Started' }, { value: 'inprogress', label: 'In Progress' }, { value: 'complete', label: 'Complete' }]} />
           <FilterDropdown id="staff" label="Staff" selected={filterStaff} onChange={setFilterStaff}
@@ -260,7 +264,7 @@ export default function DashboardPage() {
               style={{ padding: '6px 10px', fontSize: '13px', border: '1px solid #e5e7eb', borderRadius: '8px', outline: 'none', fontFamily: 'inherit', color: '#2c2c2b' }} />
           </div>
           {hasFilters && (
-            <button className="btn-ghost" onClick={() => { setFilterDept([]); setFilterStaff([]); setFilterFreelancer([]); setFilterStatus([]); setFilterDateFrom(''); setFilterDateTo('') }}
+            <button className="btn-ghost" onClick={() => { setFilterDept([]); setFilterStaff([]); setFilterFreelancer([]); setFilterStatus([]); setFilterProject([]); setFilterDateFrom(''); setFilterDateTo('') }}
               style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: '#ef4444' }}>
               <X size={13} /> Clear all
             </button>
