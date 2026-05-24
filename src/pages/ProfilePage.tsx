@@ -81,7 +81,6 @@ export default function ProfilePage({ mustChange = false }: { mustChange?: boole
       }
 
       setSuccess('Profile updated successfully!')
-      setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
 
