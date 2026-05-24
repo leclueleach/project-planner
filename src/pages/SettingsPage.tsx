@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Users, UserCheck, Tag, Calendar, ChevronUp, ChevronDown, Check, X } from 'lucide-react'
+import { Plus, Trash2, Users, UserCheck, Tag, Calendar, ChevronUp, ChevronDown, Check, X, RotateCcw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 type Tab = 'statuses' | 'staff' | 'nonworkdays' | 'users'
@@ -431,100 +431,281 @@ function NonWorkDaysTab() {
   )
 }
 
-// ── USERS ────────────────────────────────────────────────────
+// ── USERS TAB ────────────────────────────────────────────────
 function UsersTab() {
-  const queryClient = useQueryClient()
-  const [showAdd, setShowAdd] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [newEmail, setNewEmail] = useState('')
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editName, setEditName] = useState('')
-  const [editEmail, setEditEmail] = useState('')
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
-
-  const { data: users = [] } = useQuery({
-    queryKey: ['app_users'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('app_users').select('*').order('name')
-      if (error) throw error
-      return data as AppUser[]
+    const queryClient = useQueryClient()
+    const [showInvite, setShowInvite] = useState(false)
+    const [inviteName, setInviteName] = useState('')
+    const [inviteEmail, setInviteEmail] = useState('')
+    const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member')
+    const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+    const [tempPasswordModal, setTempPasswordModal] = useState<{ name: string; email: string; password: string } | null>(null)
+  
+    useEffect(() => {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) {
+          supabase.from('app_users').select('id').eq('auth_id', user.id).single()
+            .then(({ data }) => { if (data) setCurrentUserId(data.id) })
+        }
+      })
+    }, [])
+  
+    const generatePassword = () => {
+      const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$'
+      return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
     }
-  })
-
-  const addMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from('app_users').insert({ name: newName.trim(), email: newEmail.trim() })
-      if (error) throw error
-    },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['app_users'] }); setNewName(''); setNewEmail(''); setShowAdd(false) }
-  })
-
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, name, email }: { id: string; name: string; email: string }) => {
-      const { error } = await supabase.from('app_users').update({ name, email }).eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['app_users'] }); setEditingId(null) }
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('app_users').delete().eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['app_users'] }); setConfirmDelete(null) }
-  })
-
-  return (
-    <div style={{ maxWidth: '600px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <p style={{ fontSize: '14px', color: '#6b7280' }}>{users.length} users</p>
-        <button className="btn-primary" onClick={() => setShowAdd(true)}><Plus size={15} /> Add User</button>
-      </div>
-
-      {showAdd && (
-        <div className="add-form" style={{ marginBottom: '16px' }}>
-          <input autoFocus type="text" placeholder="Full name..." value={newName} onChange={e => setNewName(e.target.value)} />
-          <input type="email" placeholder="Email address..." value={newEmail} onChange={e => setNewEmail(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && newName.trim() && newEmail.trim()) addMutation.mutate(); if (e.key === 'Escape') { setShowAdd(false); setNewName(''); setNewEmail('') } }} />
-          <button className="btn-primary" onClick={() => newName.trim() && newEmail.trim() && addMutation.mutate()} disabled={!newName.trim() || !newEmail.trim()}>Add</button>
-          <button className="btn-ghost" onClick={() => { setShowAdd(false); setNewName(''); setNewEmail('') }}>Cancel</button>
-        </div>
-      )}
-
-      <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
-        {users.length === 0
-          ? <div style={{ padding: '32px', textAlign: 'center', color: '#9ca3af', fontSize: '14px' }}>No users added yet</div>
-          : users.map((u, i) => (
-            <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: i < users.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #ed1c24, #fcaf17)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '600', color: 'white' }}>
-                {u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-              </div>
-
-              {editingId === u.id ? (
-                <div style={{ flex: 1, display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <input type="text" value={editName} onChange={e => setEditName(e.target.value)} autoFocus
-                    style={{ fontSize: '14px', border: '1px solid #ed1c24', borderRadius: '6px', padding: '4px 8px', outline: 'none', fontFamily: 'inherit', minWidth: '130px' }} />
-                  <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)}
-                    style={{ fontSize: '14px', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '4px 8px', outline: 'none', fontFamily: 'inherit', minWidth: '180px' }} />
-                  <button className="btn-ghost" onClick={() => updateMutation.mutate({ id: u.id, name: editName, email: editEmail })}><Check size={14} style={{ color: '#10b981' }} /></button>
-                  <button className="btn-ghost" onClick={() => setEditingId(null)}><X size={14} style={{ color: '#6b7280' }} /></button>
+  
+    const { data: users = [] } = useQuery({
+      queryKey: ['app_users'],
+      queryFn: async () => {
+        const fiveDaysAgo = new Date()
+        fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5)
+        const { data, error } = await supabase
+          .from('app_users')
+          .select('*, invited_by_user:invited_by(name)')
+          .or(`deleted_at.is.null,deleted_at.gte.${fiveDaysAgo.toISOString()}`)
+          .order('created_at')
+        if (error) throw error
+        return data
+      }
+    })
+  
+    const inviteMutation = useMutation({
+      mutationFn: async () => {
+        const tempPassword = generatePassword()
+        // Create auth user
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: inviteEmail,
+          password: tempPassword,
+          options: { data: { name: inviteName } }
+        })
+        if (authError) throw authError
+        if (!authData.user) throw new Error('No user returned')
+        // Create app_user record
+        const { error: dbError } = await supabase.from('app_users').insert({
+          name: inviteName,
+          email: inviteEmail,
+          role: inviteRole,
+          status: 'active',
+          auth_id: authData.user.id,
+          invited_by: currentUserId,
+          invited_at: new Date().toISOString(),
+          must_change_password: true
+        })
+        if (dbError) throw dbError
+        return { name: inviteName, email: inviteEmail, password: tempPassword }
+      },
+      onSuccess: (data) => {
+        queryClient.invalidateQueries({ queryKey: ['app_users'] })
+        setTempPasswordModal(data)
+        setInviteName(''); setInviteEmail(''); setShowInvite(false)
+      }
+    })
+  
+    const suspendMutation = useMutation({
+      mutationFn: async ({ id, status }: { id: string; status: 'active' | 'suspended' }) => {
+        const { error } = await supabase.from('app_users').update({ status }).eq('id', id)
+        if (error) throw error
+      },
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ['app_users'] })
+    })
+  
+    const deleteMutation = useMutation({
+      mutationFn: async (id: string) => {
+        const { error } = await supabase.from('app_users').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+        if (error) throw error
+      },
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['app_users'] }); setConfirmDelete(null) }
+    })
+  
+    const restoreMutation = useMutation({
+      mutationFn: async (id: string) => {
+        const { error } = await supabase.from('app_users').update({ deleted_at: null, status: 'active' }).eq('id', id)
+        if (error) throw error
+      },
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ['app_users'] })
+    })
+  
+    const daysUntilExpiry = (deletedAt: string) => {
+      const expiry = new Date(deletedAt)
+      expiry.setDate(expiry.getDate() + 5)
+      return Math.ceil((expiry.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+    }
+  
+    const [copied, setCopied] = useState(false)
+    const copyPassword = (password: string) => {
+      navigator.clipboard.writeText(password)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  
+    const activeUsers = users.filter((u: any) => !u.deleted_at && u.status !== 'suspended')
+    const suspendedUsers = users.filter((u: any) => !u.deleted_at && u.status === 'suspended')
+    const deletedUsers = users.filter((u: any) => u.deleted_at)
+  
+    return (
+      <div style={{ maxWidth: '700px' }}>
+  
+        {/* Temp Password Modal */}
+        {tempPasswordModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: 'white', borderRadius: '16px', padding: '32px', maxWidth: '440px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #ed1c24, #fcaf17)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Users size={20} style={{ color: 'white' }} />
                 </div>
-              ) : (
-                <>
-                  <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => { setEditingId(u.id); setEditName(u.name); setEditEmail(u.email) }}>
-                    <div style={{ fontSize: '14px', fontWeight: '500' }}>{u.name}</div>
+                <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#2c2c2b' }}>User Created Successfully</h3>
+              </div>
+              <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '16px' }}>
+                Share these login details with <strong>{tempPasswordModal.name}</strong>. They will be required to change their password on first login.
+              </p>
+              <div style={{ background: '#f9fafb', borderRadius: '8px', padding: '16px', marginBottom: '16px' }}>
+                <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '4px' }}>Email</div>
+                <div style={{ fontSize: '14px', fontWeight: '500', color: '#2c2c2b', marginBottom: '12px' }}>{tempPasswordModal.email}</div>
+                <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '4px' }}>Temporary Password</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ fontSize: '16px', fontWeight: '700', color: '#2c2c2b', fontFamily: 'monospace', letterSpacing: '0.05em', flex: 1 }}>{tempPasswordModal.password}</div>
+                  <button className="btn-secondary" onClick={() => copyPassword(tempPasswordModal.password)} style={{ fontSize: '12px', padding: '4px 12px' }}>
+                    {copied ? '✓ Copied' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+              <div style={{ background: '#fef3c7', borderRadius: '8px', padding: '10px 14px', marginBottom: '24px', fontSize: '13px', color: '#92400e' }}>
+                ⚠️ Save this password now — it won't be shown again.
+              </div>
+              <button className="btn-primary" onClick={() => setTempPasswordModal(null)} style={{ width: '100%', justifyContent: 'center' }}>Done</button>
+            </div>
+          </div>
+        )}
+  
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <p style={{ fontSize: '14px', color: '#6b7280' }}>{activeUsers.length} active user{activeUsers.length !== 1 ? 's' : ''}</p>
+          <button className="btn-primary" onClick={() => setShowInvite(true)}><Plus size={15} /> Add User</button>
+        </div>
+  
+        {showInvite && (
+          <div className="add-form" style={{ marginBottom: '16px', flexWrap: 'wrap' }}>
+            <input autoFocus type="text" placeholder="Full name..." value={inviteName}
+              onChange={e => setInviteName(e.target.value)} style={{ minWidth: '150px' }} />
+            <input type="email" placeholder="Email address..." value={inviteEmail}
+              onChange={e => setInviteEmail(e.target.value)} style={{ minWidth: '200px' }} />
+            <select value={inviteRole} onChange={e => setInviteRole(e.target.value as 'admin' | 'member')}
+              style={{ padding: '8px 12px', fontSize: '14px', border: '1px solid #e5e7eb', borderRadius: '8px', outline: 'none', fontFamily: 'inherit' }}>
+              <option value="member">Member</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button className="btn-primary"
+              onClick={() => inviteName.trim() && inviteEmail.trim() && inviteMutation.mutate()}
+              disabled={!inviteName.trim() || !inviteEmail.trim() || inviteMutation.isPending}>
+              {inviteMutation.isPending ? 'Creating...' : 'Create User'}
+            </button>
+            <button className="btn-ghost" onClick={() => { setShowInvite(false); setInviteName(''); setInviteEmail('') }}>Cancel</button>
+          </div>
+        )}
+  
+        {inviteMutation.isError && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '13px', color: '#ef4444' }}>
+            Failed to create user. The email may already be in use.
+          </div>
+        )}
+  
+        {/* Active Users */}
+        <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', marginBottom: '24px' }}>
+          {activeUsers.length === 0
+            ? <div style={{ padding: '32px', textAlign: 'center', color: '#9ca3af', fontSize: '14px' }}>No users yet</div>
+            : activeUsers.map((u: any, i: number) => (
+              <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: i < activeUsers.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #ed1c24, #fcaf17)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '600', color: 'white' }}>
+                  {u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '500' }}>{u.name}</span>
+                    {u.id === currentUserId && <span style={{ fontSize: '11px', color: '#9ca3af', background: '#f3f4f6', padding: '1px 8px', borderRadius: '20px' }}>You</span>}
+                    {u.must_change_password && <span style={{ fontSize: '11px', color: '#92400e', background: '#fef3c7', padding: '1px 8px', borderRadius: '20px' }}>Pending login</span>}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#9ca3af' }}>
+                    {u.email}
+                    {u.invited_by_user && ` · Invited by ${u.invited_by_user.name}`}
+                    {u.invited_at && ` on ${new Date(u.invited_at).toLocaleDateString('en-ZA')}`}
+                  </div>
+                </div>
+                <span style={{ fontSize: '12px', fontWeight: '500', padding: '2px 10px', borderRadius: '20px', background: u.role === 'admin' ? '#fef3c7' : '#dbeafe', color: u.role === 'admin' ? '#92400e' : '#1d4ed8' }}>
+                  {u.role}
+                </span>
+                {u.id !== currentUserId && (
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button className="btn-ghost" style={{ fontSize: '12px', color: '#f59e0b' }}
+                      onClick={() => suspendMutation.mutate({ id: u.id, status: 'suspended' })}>
+                      Suspend
+                    </button>
+                    {confirmDelete === u.id
+                      ? <ConfirmDelete onConfirm={() => deleteMutation.mutate(u.id)} onCancel={() => setConfirmDelete(null)} />
+                      : <button className="btn-ghost" onClick={() => setConfirmDelete(u.id)}><Trash2 size={14} style={{ color: '#ef4444' }} /></button>
+                    }
+                  </div>
+                )}
+              </div>
+            ))}
+        </div>
+  
+        {/* Suspended Users */}
+        {suspendedUsers.length > 0 && (
+          <div style={{ marginBottom: '24px' }}>
+            <p className="section-label">Suspended</p>
+            <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
+              {suspendedUsers.map((u: any, i: number) => (
+                <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: i < suspendedUsers.length - 1 ? '1px solid #f3f4f6' : 'none', opacity: 0.7 }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0, background: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '600', color: '#9ca3af' }}>
+                    {u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: '14px', fontWeight: '500', color: '#6b7280' }}>{u.name}</span>
                     <div style={{ fontSize: '12px', color: '#9ca3af' }}>{u.email}</div>
                   </div>
-                  {confirmDelete === u.id
-                    ? <ConfirmDelete onConfirm={() => deleteMutation.mutate(u.id)} onCancel={() => setConfirmDelete(null)} />
-                    : <button className="btn-ghost" onClick={() => setConfirmDelete(u.id)}><Trash2 size={14} style={{ color: '#ef4444' }} /></button>
-                  }
-                </>
-              )}
+                  <span style={{ fontSize: '12px', fontWeight: '500', padding: '2px 10px', borderRadius: '20px', background: '#fef3c7', color: '#92400e' }}>Suspended</span>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button className="btn-ghost" style={{ fontSize: '12px', color: '#10b981' }}
+                      onClick={() => suspendMutation.mutate({ id: u.id, status: 'active' })}>
+                      Restore
+                    </button>
+                    {confirmDelete === u.id
+                      ? <ConfirmDelete onConfirm={() => deleteMutation.mutate(u.id)} onCancel={() => setConfirmDelete(null)} />
+                      : <button className="btn-ghost" onClick={() => setConfirmDelete(u.id)}><Trash2 size={14} style={{ color: '#ef4444' }} /></button>
+                    }
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+        )}
+  
+        {/* Recently Deleted */}
+        {deletedUsers.length > 0 && (
+          <div>
+            <p className="section-label">Recently Deleted</p>
+            <div style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '12px', overflow: 'hidden' }}>
+              {deletedUsers.map((u: any, i: number) => (
+                <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: i < deletedUsers.length - 1 ? '1px solid #fecaca' : 'none', opacity: 0.7 }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0, background: '#fecaca', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '600', color: '#ef4444' }}>
+                    {u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: '14px', fontWeight: '500', color: '#6b7280' }}>{u.name}</span>
+                    <div style={{ fontSize: '12px', color: '#ef4444' }}>
+                      Deleted · {daysUntilExpiry(u.deleted_at)} day{daysUntilExpiry(u.deleted_at) !== 1 ? 's' : ''} left
+                    </div>
+                  </div>
+                  <button className="btn-ghost" style={{ fontSize: '12px', color: '#2c2c2b', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    onClick={() => restoreMutation.mutate(u.id)}>
+                    <RotateCcw size={14} /> Restore
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  )
-}
+    )
+  }

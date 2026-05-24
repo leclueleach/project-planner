@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, Settings, LogOut, UserCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 export default function Layout() {
@@ -25,6 +25,10 @@ export default function Layout() {
           <NavLink to="/settings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
             <Settings size={16} />
             Settings
+          </NavLink>
+          <NavLink to="/profile" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            <UserCircle size={16} />
+            Profile
           </NavLink>
           <button onClick={handleSignOut} className="nav-link" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
             <LogOut size={16} />
