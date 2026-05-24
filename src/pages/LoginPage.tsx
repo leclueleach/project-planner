@@ -64,13 +64,13 @@ const { data, error: authError } = await supabase.auth.signInWithPassword({ emai
     e.preventDefault()
     setLoading(true)
     setError('')
-
+  
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
+      redirectTo: 'https://project-planner-ashy.vercel.app',
     })
-
+  
     if (resetError) {
-      setError('Failed to send reset email. Please try again.')
+      setError(resetError.message)
     } else {
       setResetSent(true)
     }
