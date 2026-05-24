@@ -471,36 +471,34 @@ function UsersTab() {
     })
   
     const inviteMutation = useMutation({
-      mutationFn: async () => {
-        const tempPassword = generatePassword()
-        // Create auth user
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: inviteEmail,
-          password: tempPassword,
-          options: { data: { name: inviteName } }
-        })
-        if (authError) throw authError
-        if (!authData.user) throw new Error('No user returned')
-        // Create app_user record
-        const { error: dbError } = await supabase.from('app_users').insert({
-          name: inviteName,
-          email: inviteEmail,
-          role: inviteRole,
-          status: 'active',
-          auth_id: authData.user.id,
-          invited_by: currentUserId,
-          invited_at: new Date().toISOString(),
-          must_change_password: true
-        })
-        if (dbError) throw dbError
-        return { name: inviteName, email: inviteEmail, password: tempPassword }
-      },
-      onSuccess: (data) => {
-        queryClient.invalidateQueries({ queryKey: ['app_users'] })
-        setTempPasswordModal(data)
-        setInviteName(''); setInviteEmail(''); setShowInvite(false)
-      }
-    })
+        mutationFn: async () => {
+          const tempPassword = generatePassword()
+      
+          const response = await fetch('/api/create-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: inviteName,
+              email: inviteEmail,
+              role: inviteRole,
+              invitedBy: currentUserId,
+              tempPassword
+            })
+          })
+      
+          if (!response.ok) {
+            const data = await response.json()
+            throw new Error(data.error || 'Failed to create user')
+          }
+      
+          return { name: inviteName, email: inviteEmail, password: tempPassword }
+        },
+        onSuccess: (data) => {
+          queryClient.invalidateQueries({ queryKey: ['app_users'] })
+          setTempPasswordModal(data)
+          setInviteName(''); setInviteEmail(''); setShowInvite(false)
+        }
+      })
   
     const suspendMutation = useMutation({
       mutationFn: async ({ id, status }: { id: string; status: 'active' | 'suspended' }) => {
