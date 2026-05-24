@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 
 type Tab = 'statuses' | 'staff' | 'nonworkdays' | 'users'
 
-interface Status { id: string; name: string; colour: string; sort_order: number }
+interface Status { id: string; name: string; colour: string; sort_order: number; is_system: boolean }
 interface Staff { id: string; name: string; email: string | null; type: 'internal' | 'freelancer'; active: boolean }
 interface NonWorkDay { id: string; date: string; name: string; type: 'public_holiday' | 'company_holiday' }
 interface AppUser { id: string; name: string; email: string }
@@ -157,26 +157,32 @@ function StatusesTab() {
             </div>
 
             {editingId === s.id ? (
-              <>
-                <input type="color" value={editColour} onChange={e => setEditColour(e.target.value)}
-                  style={{ width: '32px', height: '32px', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer', padding: '2px', flexShrink: 0 }} />
-                <input type="text" value={editName} onChange={e => setEditName(e.target.value)} autoFocus
-                  onKeyDown={e => { if (e.key === 'Enter') updateMutation.mutate({ id: s.id, name: editName, colour: editColour }); if (e.key === 'Escape') setEditingId(null) }}
-                  style={{ flex: 1, fontSize: '14px', border: '1px solid #ed1c24', borderRadius: '6px', padding: '4px 8px', outline: 'none', fontFamily: 'inherit' }} />
-                <button className="btn-ghost" onClick={() => updateMutation.mutate({ id: s.id, name: editName, colour: editColour })}><Check size={14} style={{ color: '#10b981' }} /></button>
-                <button className="btn-ghost" onClick={() => setEditingId(null)}><X size={14} style={{ color: '#6b7280' }} /></button>
-              </>
-            ) : (
-              <>
-                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: s.colour, flexShrink: 0 }} />
-                <span style={{ flex: 1, fontSize: '14px', fontWeight: '500', cursor: 'pointer' }} onClick={() => startEdit(s)}>{s.name}</span>
-                <span style={{ fontSize: '11px', color: '#9ca3af' }}>click to edit</span>
-                {confirmDelete === s.id
-                  ? <ConfirmDelete onConfirm={() => deleteMutation.mutate(s.id)} onCancel={() => setConfirmDelete(null)} />
-                  : <button className="btn-ghost" onClick={() => setConfirmDelete(s.id)}><Trash2 size={14} style={{ color: '#ef4444' }} /></button>
-                }
-              </>
-            )}
+  <>
+    <input type="color" value={editColour} onChange={e => setEditColour(e.target.value)}
+      style={{ width: '32px', height: '32px', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer', padding: '2px', flexShrink: 0 }} />
+    <input type="text" value={editName} onChange={e => setEditName(e.target.value)} autoFocus
+      onKeyDown={e => { if (e.key === 'Enter') updateMutation.mutate({ id: s.id, name: editName, colour: editColour }); if (e.key === 'Escape') setEditingId(null) }}
+      style={{ flex: 1, fontSize: '14px', border: '1px solid #ed1c24', borderRadius: '6px', padding: '4px 8px', outline: 'none', fontFamily: 'inherit' }} />
+    <button className="btn-ghost" onClick={() => updateMutation.mutate({ id: s.id, name: editName, colour: editColour })}><Check size={14} style={{ color: '#10b981' }} /></button>
+    <button className="btn-ghost" onClick={() => setEditingId(null)}><X size={14} style={{ color: '#6b7280' }} /></button>
+  </>
+) : (
+  <>
+    <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: s.colour, flexShrink: 0 }} />
+    <span style={{ flex: 1, fontSize: '14px', fontWeight: '500', cursor: s.is_system ? 'default' : 'pointer' }}
+      onClick={() => !s.is_system && startEdit(s)}>{s.name}</span>
+    {s.is_system
+      ? <span style={{ fontSize: '11px', color: '#9ca3af', padding: '2px 8px', background: '#f3f4f6', borderRadius: '20px' }}>System</span>
+      : <>
+          <span style={{ fontSize: '11px', color: '#9ca3af' }}>click to edit</span>
+          {confirmDelete === s.id
+            ? <ConfirmDelete onConfirm={() => deleteMutation.mutate(s.id)} onCancel={() => setConfirmDelete(null)} />
+            : <button className="btn-ghost" onClick={() => setConfirmDelete(s.id)}><Trash2 size={14} style={{ color: '#ef4444' }} /></button>
+          }
+        </>
+    }
+  </>
+)}
           </div>
         ))}
       </div>

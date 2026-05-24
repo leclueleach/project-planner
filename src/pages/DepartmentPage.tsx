@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, ArrowLeft, FolderOpen, Archive, MoreVertical, ChevronRight } from 'lucide-react'
+import { Plus, ArrowLeft, FolderOpen, Archive, MoreVertical, ChevronRight, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 interface Department { id: string; name: string; archived: boolean }
@@ -54,6 +54,35 @@ export default function DepartmentPage() {
     }
   })
 
+  const { data: projectWarnings = [] } = useQuery({
+    queryKey: ['project-warnings', id],
+    queryFn: async () => {
+      if (projects.length === 0) return []
+      const projectIds = projects.map(p => p.id)
+      const { data: comps } = await supabase.from('components').select('id, project_id').in('project_id', projectIds)
+      if (!comps?.length) return []
+      const compIds = comps.map(c => c.id)
+      const { data: issuesList } = await supabase.from('issues').select('id, component_id').in('component_id', compIds)
+      if (!issuesList?.length) return []
+      const issueIds = issuesList.map(i => i.id)
+      const { data: fields } = await supabase.from('issue_fields').select('issue_id, start_date, end_date').in('issue_id', issueIds)
+      if (!fields?.length) return []
+      const compToProject: Record<string, string> = {}
+      comps.forEach(c => { compToProject[c.id] = c.project_id })
+      const issueToProject: Record<string, string> = {}
+      issuesList.forEach(i => { issueToProject[i.id] = compToProject[i.component_id] })
+      const warningProjectIds = new Set<string>()
+      fields.forEach(f => {
+        const proj = projects.find(p => p.id === issueToProject[f.issue_id])
+        if (!proj) return
+        if (proj.planned_start_date && f.start_date && f.start_date < proj.planned_start_date) warningProjectIds.add(proj.id)
+        if (proj.planned_end_date && f.end_date && f.end_date > proj.planned_end_date) warningProjectIds.add(proj.id)
+      })
+      return Array.from(warningProjectIds)
+    },
+    enabled: projects.length > 0
+  })
+
   const addMutation = useMutation({
     mutationFn: async (name: string) => {
       const { error } = await supabase.from('projects').insert({
@@ -89,7 +118,8 @@ export default function DepartmentPage() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '—'
-    return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+    const [year, month, day] = dateStr.split('-')
+    return `${year}/${month}/${day}`
   }
 
   if (isLoading) {
@@ -117,12 +147,9 @@ export default function DepartmentPage() {
       {/* Add Form */}
       {showAdd && (
         <div className="add-form" style={{ marginBottom: '24px', flexWrap: 'wrap' }}>
-          <input
-            autoFocus type="text" placeholder="Project name..."
-            value={newName} onChange={e => setNewName(e.target.value)}
-            style={{ minWidth: '200px' }}
-            onKeyDown={e => { if (e.key === 'Escape') { setShowAdd(false); setNewName('') } }}
-          />
+          <input autoFocus type="text" placeholder="Project name..." value={newName}
+            onChange={e => setNewName(e.target.value)} style={{ minWidth: '200px' }}
+            onKeyDown={e => { if (e.key === 'Escape') { setShowAdd(false); setNewName('') } }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <label style={{ fontSize: '12px', color: '#6b7280', whiteSpace: 'nowrap' }}>Planned Start</label>
             <input type="date" value={newStartDate} onChange={e => setNewStartDate(e.target.value)}
@@ -147,16 +174,14 @@ export default function DepartmentPage() {
         </div>
       ) : (
         <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'visible', marginBottom: '32px' }}>
-          {/* Table Header */}
-          <div style={{ display: 'grid', gridTemplateColumns: headerCols, gap: '12px', padding: '10px 20px', background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: headerCols, gap: '12px', padding: '10px 20px', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', borderRadius: '12px 12px 0 0' }}>
             {['Project', 'Planned Start', 'Planned End', 'Actual Start', 'Actual End', 'Progress', ''].map((h, i) => (
               <div key={i} style={{ fontSize: '11px', fontWeight: '600', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</div>
             ))}
           </div>
 
           {active.map((project, i) => (
-            <div
-              key={project.id}
+            <div key={project.id}
               style={{ display: 'grid', gridTemplateColumns: headerCols, gap: '12px', padding: '14px 20px', borderBottom: i < active.length - 1 ? '1px solid #f3f4f6' : 'none', alignItems: 'center', cursor: 'pointer', transition: 'background 0.15s', position: 'relative' }}
               onClick={() => navigate(`/projects/${project.id}`)}
               onMouseEnter={e => (e.currentTarget.style.background = '#fafafa')}
@@ -165,6 +190,7 @@ export default function DepartmentPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ChevronRight size={14} style={{ color: '#9ca3af' }} />
                 <span style={{ fontSize: '14px', fontWeight: '500', color: '#2c2c2b' }}>{project.name}</span>
+                {projectWarnings.includes(project.id) && <AlertTriangle size={14} style={{ color: '#ef4444' }} />}
               </div>
               <div style={{ fontSize: '13px', color: '#6b7280' }}>{formatDate(project.planned_start_date)}</div>
               <div style={{ fontSize: '13px', color: '#6b7280' }}>{formatDate(project.planned_end_date)}</div>
@@ -176,8 +202,6 @@ export default function DepartmentPage() {
                 </div>
                 <span style={{ fontSize: '12px', fontWeight: '600', color: '#2c2c2b', minWidth: '32px', textAlign: 'right' }}>0%</span>
               </div>
-
-              {/* Menu */}
               <div style={{ position: 'relative', zIndex: 10 }} onClick={e => e.stopPropagation()}>
                 <button className="btn-ghost" onClick={() => setMenuOpen(menuOpen === project.id ? null : project.id)}>
                   <MoreVertical size={15} />
@@ -186,11 +210,7 @@ export default function DepartmentPage() {
                   <div className="dropdown" style={{ right: 0, left: 'auto', zIndex: 20 }}>
                     {confirmArchive === project.id ? (
                       <div style={{ padding: '8px 12px' }}>
-                        <ConfirmAction
-                          label="Archive?"
-                          onConfirm={() => archiveMutation.mutate({ projectId: project.id, archived: true })}
-                          onCancel={() => setConfirmArchive(null)}
-                        />
+                        <ConfirmAction label="Archive?" onConfirm={() => archiveMutation.mutate({ projectId: project.id, archived: true })} onCancel={() => setConfirmArchive(null)} />
                       </div>
                     ) : (
                       <button className="dropdown-item" onClick={() => setConfirmArchive(project.id)}>
@@ -209,7 +229,7 @@ export default function DepartmentPage() {
       {archived.length > 0 && (
         <div>
           <p className="section-label">Archived Projects</p>
-          <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
+          <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'visible' }}>
             {archived.map((project, i) => (
               <div key={project.id} style={{ display: 'grid', gridTemplateColumns: headerCols, gap: '12px', padding: '14px 20px', borderBottom: i < archived.length - 1 ? '1px solid #f3f4f6' : 'none', alignItems: 'center', opacity: 0.5 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
