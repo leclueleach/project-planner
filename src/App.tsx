@@ -1,11 +1,47 @@
-import { Routes, Route } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { supabase } from './lib/supabase'
 import Layout from './components/Layout'
+import LoginPage from './pages/LoginPage'
 import DepartmentsPage from './pages/DepartmentsPage'
 import DepartmentPage from './pages/DepartmentPage'
 import ProjectPage from './pages/ProjectPage'
 import SettingsPage from './pages/SettingsPage'
 
 function App() {
+  const [session, setSession] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setLoading(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const handleLogin = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    setSession(session)
+  }
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="spinner" />
+      </div>
+    )
+  }
+
+  if (!session) {
+    return <LoginPage onLogin={handleLogin} />
+  }
+
   return (
     <Routes>
       <Route path="/" element={<Layout />}>
@@ -14,6 +50,7 @@ function App() {
         <Route path="projects/:id" element={<ProjectPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
+      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   )
 }
