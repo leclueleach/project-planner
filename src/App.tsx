@@ -9,11 +9,13 @@ import ProjectPage from './pages/ProjectPage'
 import SettingsPage from './pages/SettingsPage'
 import ProfilePage from './pages/ProfilePage'
 import HistoryPage from './pages/HistoryPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 
 function App() {
   const [session, setSession] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [mustChangePassword, setMustChangePassword] = useState(false)
+  const [isPasswordReset, setIsPasswordReset] = useState(false)
 
   const checkMustChange = async (authId: string) => {
     await setAuditUser(authId)
@@ -22,17 +24,26 @@ function App() {
   }
 
   useEffect(() => {
+    // Handle password reset redirect
+    const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'))
+    const type = hashParams.get('type')
+    if (type === 'recovery') {
+      setIsPasswordReset(true)
+      setLoading(false)
+      return
+    }
+  
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       if (session) checkMustChange(session.user.id)
       setLoading(false)
     })
-
+  
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       if (session) checkMustChange(session.user.id)
     })
-
+  
     return () => subscription.unsubscribe()
   }, [])
 
@@ -50,6 +61,7 @@ function App() {
     )
   }
 
+  if (isPasswordReset) return <ResetPasswordPage />
   if (!session) return <LoginPage onLogin={handleLogin} />
 
   if (mustChangePassword) {
