@@ -19,7 +19,12 @@ function App() {
 
   const checkMustChange = async (authId: string) => {
     await setAuditUser(authId)
-    const { data } = await supabase.from('app_users').select('must_change_password').eq('auth_id', authId).single()
+    const { data, error } = await supabase
+      .from('app_users')
+      .select('must_change_password')
+      .eq('auth_id', authId)
+      .single()
+    console.log('checkMustChange:', { authId, data, error })
     setMustChangePassword(data?.must_change_password || false)
   }
 
