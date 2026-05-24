@@ -57,7 +57,7 @@ function App() {
     )
   }
 
-  if (isPasswordReset) return <ResetPasswordPage />
+  if (isPasswordReset) return <ResetPasswordPage onComplete={() => setIsPasswordReset(false)} />
   if (!session) return <LoginPage onLogin={handleLogin} />
 
   if (mustChangePassword) {

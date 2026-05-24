@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-export default function ResetPasswordPage() {
+export default function ResetPasswordPage({ onComplete }: { onComplete?: () => void }) {
   const navigate = useNavigate()
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -33,8 +33,15 @@ export default function ResetPasswordPage() {
     }
 
     setSuccess(true)
-    setTimeout(() => navigate('/'), 2000)
+    setTimeout(() => {
+      if (onComplete) onComplete()
+      navigate('/')
+    }, 2000)
     setLoading(false)
+  }
+
+  const handleBack = () => {
+    if (onComplete) onComplete()
   }
 
   return (
@@ -85,7 +92,15 @@ export default function ResetPasswordPage() {
               </button>
             </form>
           )}
+
+          <p style={{ textAlign: 'center', marginTop: '16px' }}>
+            <button onClick={handleBack}
+              style={{ background: 'none', border: 'none', fontSize: '13px', color: '#6b7280', cursor: 'pointer', fontFamily: 'inherit' }}>
+              ← Back to sign in
+            </button>
+          </p>
         </div>
+
         <p style={{ textAlign: 'center', fontSize: '13px', color: '#9ca3af', marginTop: '24px' }}>
           PawPaw Creative School of Business
         </p>
