@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { supabase } from './lib/supabase'
+import { supabase, setAuditUser } from './lib/supabase'
 import Layout from './components/Layout'
 import LoginPage from './pages/LoginPage'
 import DepartmentsPage from './pages/DepartmentsPage'
@@ -8,11 +8,18 @@ import DepartmentPage from './pages/DepartmentPage'
 import ProjectPage from './pages/ProjectPage'
 import SettingsPage from './pages/SettingsPage'
 import ProfilePage from './pages/ProfilePage'
+import HistoryPage from './pages/HistoryPage'
 
 function App() {
   const [session, setSession] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [mustChangePassword, setMustChangePassword] = useState(false)
+
+  const checkMustChange = async (authId: string) => {
+    await setAuditUser(authId)
+    const { data } = await supabase.from('app_users').select('must_change_password').eq('auth_id', authId).single()
+    setMustChangePassword(data?.must_change_password || false)
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -28,11 +35,6 @@ function App() {
 
     return () => subscription.unsubscribe()
   }, [])
-
-  const checkMustChange = async (authId: string) => {
-    const { data } = await supabase.from('app_users').select('must_change_password').eq('auth_id', authId).single()
-    setMustChangePassword(data?.must_change_password || false)
-  }
 
   const handleLogin = async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -74,6 +76,7 @@ function App() {
         <Route path="projects/:id" element={<ProjectPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="history" element={<HistoryPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
