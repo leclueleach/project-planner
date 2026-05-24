@@ -1,6 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { LayoutDashboard, Settings, LogOut, UserCircle, History } from 'lucide-react'
 import { LayoutDashboard, Settings, LogOut, UserCircle, History, BarChart2 } from 'lucide-react'
 
 export default function Layout() {

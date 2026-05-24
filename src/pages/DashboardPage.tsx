@@ -312,7 +312,7 @@ export default function DashboardPage() {
           const deptNotStarted = deptProjects.filter(p => getProjectStatus(p.id).label === 'Not Started').length
           const hasWarning = deptProjects.some(p => {
             const dates = getProjectActualDates(p.id)
-            return (p.planned_end_date && dates.end && dates.end > p.planned_end_date)
+            return !!(p.planned_end_date && dates.end && (dates.end as string) > (p.planned_end_date as string))
           })
           return (
             <div key={dept.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 80px 80px 160px', gap: '12px', padding: '12px 20px', borderBottom: i < filteredDepts.length - 1 ? '1px solid #f3f4f6' : 'none', alignItems: 'center' }}>
