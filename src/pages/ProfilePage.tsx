@@ -85,8 +85,13 @@ export default function ProfilePage({ mustChange = false }: { mustChange?: boole
       setConfirmPassword('')
 
       if (mustChange) {
-        setTimeout(() => navigate('/'), 1500)
-      }
+  // Re-check session to trigger App.tsx to re-evaluate mustChangePassword
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session) {
+    await supabase.auth.refreshSession()
+  }
+  setTimeout(() => window.location.href = '/', 1500)
+}
     } catch (err: any) {
       setError(err.message || 'Failed to update profile. Please try again.')
     }
